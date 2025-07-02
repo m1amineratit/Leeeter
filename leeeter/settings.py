@@ -59,11 +59,9 @@ SITE_ID = 1
 
 REST_USE_JWT = True
 
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
     ),
 }
 

@@ -13,7 +13,11 @@ from .serializers import (
 from .permissions import IsOwner
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from dj_rest_auth.registration.views import SocialLoginView
 
+class GoogleLogin(SocialLoginView):
+    adapter_class = GoogleOAuth2Adapter
 
 # Page ViewSet with subscribe/unsubscribe actions
 class PageViewSet(ModelViewSet):
