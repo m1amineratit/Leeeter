@@ -1,17 +1,54 @@
-# Leeeter
+# Leeeter API
 
-A Django REST API project for business and profile management.
+A modern Django REST Framework API for business pages, built with secure **Google OAuth2 authentication only**.
 
-## 🚀 Setup Instructions
+---
 
-### 1. Clone the repository
+## 🚀 Features
 
-```sh
-git clone https://github.com/m1amineratit/Leeeter.git
-cd Leeeter
-```
+- **Google-only authentication:** No basic or password login, only Google OAuth2.
+- **RESTful API:** Clean endpoints for business, client, and page management.
+- **Secure:** JWT authentication, no session or basic auth endpoints exposed.
+- **Scalable:** Modular code with clear separation of models, serializers, and views.
+- **Browsable API:** Swagger and Redoc documentation included.
 
-### 2. Create and activate a virtual environment
+---
+
+## 🔒 Authentication
+
+**Only Google OAuth2 is supported.**  
+Users must log in with their Google account to access any protected endpoints.
+
+### How it works
+
+1. **Frontend:** Obtain a Google OAuth2 access token (using Google Sign-In).
+2. **Backend:**  
+   Send a POST request to:
+
+   ```
+   POST /api/auth/google/login/
+   Content-Type: application/json
+
+   {
+     "access_token": "GOOGLE_ACCESS_TOKEN"
+   }
+   ```
+
+3. **Response:**  
+   You receive a JWT token and user info for authenticated API access.
+
+---
+
+## ⚙️ Setup Instructions
+
+1. **Clone the repo and install dependencies:**
+    ```sh
+    git clone https://github.com/m1amineratit/Leeeter.git
+    cd Leeeter
+    pip install -r requirements.txt
+    ```
+
+2. **Create and activate a virtual environment**
 
 ```sh
 python -m venv venv
@@ -21,53 +58,78 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-### 3. Install dependencies
+3. **Configure Google OAuth2:**
+    - Create OAuth credentials at [Google Developer Console](https://console.developers.google.com/).
+    - Set the **Authorized redirect URI** to:
+      ```
+      http://localhost:8000/api/auth/google/login/callback/
+      ```
+    - Add your Google client ID and secret to your environment or `settings.py`:
+      ```python
+      SOCIALACCOUNT_PROVIDERS = {
+          'google': {
+              'SCOPE': ['profile', 'email'],
+              'AUTH_PARAMS': {'access_type': 'online'},
+              'APP': {
+                  'client_id': '<your-client-id>',
+                  'secret': '<your-client-secret>',
+                  'key': ''
+              }
+          }
+      }
+      ```
 
-```sh
-pip install -r requirements.txt
-```
+4. **Run migrations:**
+    ```sh
+    python manage.py migrate
+    ```
 
-### 4. Set up environment variables
+5. **Start the server:**
+    ```sh
+    python manage.py runserver
+    ```
 
-Create a `.env` file in the project root with:
+6. **Access the API docs:**
+    - Swagger: [http://localhost:8000/swagger/](http://localhost:8000/swagger/)
+    - Redoc: [http://localhost:8000/redoc/](http://localhost:8000/redoc/)
 
-```
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-```
+---
 
-### 5. Apply migrations
+## 🧪 Testing Google Login
 
-```sh
-python manage.py makemigrations
-python manage.py migrate
-```
+You can test Google login using Postman or the browsable API:
 
-### 6. Create a superuser
+- **Endpoint:** `POST /api/auth/google/login/`
+- **Body:**
+    ```json
+    {
+      "access_token": "your_google_access_token"
+    }
+    ```
 
-```sh
-python manage.py createsuperuser
-```
+---
 
-### 7. Run the development server
+## 📁 Project Structure
 
-```sh
-python manage.py runserver
-```
-
-### 8. Access the API
-
-- API root: [http://localhost:8000/api/](http://localhost:8000/api/)
-- Admin: [http://localhost:8000/admin/](http://localhost:8000/admin/)
-- Swagger docs: [http://localhost:8000/swagger/](http://localhost:8000/swagger/)
+- `core/` — Main app with models, serializers, and views.
+- `leeeter/` — Project settings and URLs.
+- `requirements.txt` — Python dependencies.
 
 ---
 
 ## 📝 Notes
 
-- Make sure you have Python 3.8+ installed.
-- For Google login, set up OAuth credentials in the Google Cloud Console and add the redirect URI as described in the docs.
-- All sensitive settings should be stored in the `.env` file.
+- **No registration, password reset, or basic login endpoints are exposed.**
+- **All authentication is handled via Google OAuth2.**
+- **Admin access is available at `/admin/` for superusers.**
 
 ---
+
+## 🙋‍♂️ Questions?
+
+If you have any questions or need a demo frontend, please let me know!
+
+---
+
+**Thank you for reviewing this project!**
 
