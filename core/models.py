@@ -104,7 +104,7 @@ class Card(models.Model):
     page_name = models.CharField(max_length=100, verbose_name="Page or Brand Name")
     page_url = models.SlugField(unique=True, verbose_name="Page URL (subdomain or slug)")
     accept_terms = models.BooleanField(default=False)
-    receive_newsletter = models.BooleanField(default=False)
+    receive_newsletter = models.BooleanField(default=False, blank=True, null=True)
 
     def __str__(self):
         return self.page_name
