@@ -16,7 +16,7 @@ router.register(r'cards', views.CardView, basename='card')
 router.register(r'clients', views.ClientView, basename='client')
 router.register(r'connections', views.ConnectionView, basename='connection')
 router.register(r'profile', views.ProfileViewSet, basename='profile')
-
+router.register(r'pages', views.PageViewSet, basename='page')
 
 urlpatterns = [
     path('', include(router.urls))

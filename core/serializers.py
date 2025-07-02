@@ -1,8 +1,14 @@
 from rest_framework import serializers
 from .models import (
-    Business, Contact, Location, Hour, Social, Media, FAQ,
+    Page, Business, Contact, Location, Hour, Social, Media, FAQ,
     Card, Client, Connection, Profile
 )
+
+class PageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Page
+        fields = '__all__'
+        read_only_fields = ['owner', 'subscribers', 'created_at']
 
 class BusinessSerializer(serializers.ModelSerializer):
     class Meta:
@@ -61,8 +67,8 @@ class ClientSerializer(serializers.ModelSerializer):
 class ConnectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Connection
-        read_only_fields = ['user']
         fields = '__all__'
+        read_only_fields = ['user']
 
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:

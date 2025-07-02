@@ -4,9 +4,28 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+MODE_CHOICE = [
+    ('online', 'Online'),
+    ('offline', 'Offline'),
+    ('hybrid', 'Hybrid'),
+]
+
+class Page(models.Model):
+    owner = models.OneToOneField(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+    description = models.TextField(blank=True, null=True)
+    profile_image = models.ImageField(upload_to='pages_profiles/', blank=True, null=True)
+    cover_image = models.ImageField(upload_to='pages_cover/', blank=True, null=True)
+    subscribers = models.ManyToManyField(User, related_name='subscribed_pages', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
 
 class Client(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cleint_profiles')
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='clients')
     full_name = models.CharField(max_length=150)
     date = models.DateField(auto_now_add=True)
 
@@ -14,11 +33,7 @@ class Client(models.Model):
         return self.full_name
 
 class Business(models.Model):
-    MODE_CHOICE = (
-        ('Online', 'online'),
-        ('Offline', 'offline'),
-        ('Hybird', 'hybird')
-    )
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='businesses')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     mode = models.CharField(max_length=100, choices=MODE_CHOICE, verbose_name='Working Mode')
     activity = models.CharField(max_length=150, verbose_name='Business Activity')
@@ -34,21 +49,25 @@ class Business(models.Model):
         return f"{self.activity} - {self.service}"
 
 class Contact(models.Model):
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='contacts')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     whatsapp_number = models.CharField(max_length=20)
     email = models.EmailField()
 
 class Location(models.Model):
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='locations')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     country = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
     location_address = models.CharField(max_length=150)
 
 class Hour(models.Model):
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='hours')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     hour = models.TimeField()
 
 class Social(models.Model):
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='socials')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     instagram = models.CharField(max_length=150)
     facebook = models.CharField(max_length=150)
@@ -61,6 +80,7 @@ class Social(models.Model):
 
 class Media(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='media')
     cover_image = models.ImageField(upload_to='cover_images/')
     profile_image = models.ImageField(upload_to='profile/')
     video = models.FileField(upload_to='videos/')
@@ -68,6 +88,7 @@ class Media(models.Model):
 
 class FAQ(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='faqs')
     question = models.CharField(max_length=150)
     answer = models.CharField(max_length=150)  # Fixed typo
 
@@ -78,6 +99,7 @@ class Card(models.Model):
         ('brand', 'Brand'),
     ]
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='cards')
     card_type = models.CharField(max_length=100, choices=CARD_TYPE_CHOICES, verbose_name='Card Type')
     page_name = models.CharField(max_length=100, verbose_name="Page or Brand Name")
     page_url = models.SlugField(unique=True, verbose_name="Page URL (subdomain or slug)")
@@ -93,11 +115,12 @@ class Connection(models.Model):
         ('active', 'Active'),
         ('archived', 'Archived'),
     ]
-    user = models.ForeignKey(User ,on_delete=models.CASCADE)
-    client = models.ForeignKey(Client, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='client_connections')
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='connections')
     full_name = models.CharField(max_length=150)
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE)
+    location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='connection_locations')
     label = models.CharField(max_length=150)
     active = models.CharField(max_length=100, choices=STATUS_CHOICES, default='active')
 
@@ -111,6 +134,7 @@ class Profile(models.Model):
         ('other', 'Other'),
     ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='profiles')
     phone = models.CharField(max_length=20, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True)
     birthdate = models.DateField(null=True, blank=True)

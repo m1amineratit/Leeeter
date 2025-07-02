@@ -1,26 +1,52 @@
 from django.shortcuts import render
 from .models import (
-    Business, Contact, Location, Hour, Social, Media, FAQ,
+    Page, Business, Contact, Location, Hour, Social, Media, FAQ,
     Card, Client, Connection, Profile
 )
 from rest_framework import permissions, viewsets
 from rest_framework.viewsets import ModelViewSet
 from .serializers import (
-    BusinessSerializer, ContactSerializer, LocationSerializer, HoursSerializer,
+    PageSerializer, BusinessSerializer, ContactSerializer, LocationSerializer, HoursSerializer,
     SocialSerializer, MediaSerializer, FAQSerializer, CardSerializer,
     ClientSerializer, ConnectionSerializer, ProfileSerializer
 )
 from .permissions import IsOwner
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
-# Create your views here.
 
+# Page ViewSet with subscribe/unsubscribe actions
+class PageViewSet(ModelViewSet):
+    serializer_class = PageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Show pages owned by the user or all pages (customize as needed)
+        return Page.objects.all()
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def subscribe(self, request, pk=None):
+        page = self.get_object()
+        page.subscribers.add(request.user)
+        return Response({'status': 'subscribed'})
+
+    @action(detail=True, methods=['post'])
+    def unsubscribe(self, request, pk=None):
+        page = self.get_object()
+        page.subscribers.remove(request.user)
+        return Response({'status': 'unsubscribed'})
+
+# All other ViewSets now require a page relation
 class BusinessView(ModelViewSet):
     serializer_class = BusinessSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwner]
 
     def get_queryset(self):
         return Business.objects.filter(user=self.request.user)
-    
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
@@ -30,7 +56,7 @@ class ContactView(ModelViewSet):
 
     def get_queryset(self):
         return Contact.objects.filter(user=self.request.user)
-    
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
@@ -40,7 +66,7 @@ class LocationView(ModelViewSet):
 
     def get_queryset(self):
         return Location.objects.filter(user=self.request.user)
-    
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
@@ -60,7 +86,7 @@ class SocialView(ModelViewSet):
 
     def get_queryset(self):
         return Social.objects.filter(user=self.request.user)
-    
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
@@ -69,18 +95,18 @@ class MediaView(ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsOwner]
 
     def get_queryset(self):
-        return Media.objects.all()
-    
+        return Media.objects.filter(user=self.request.user)
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
-    
+
 class FAQView(ModelViewSet):
     serializer_class = FAQSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwner]
 
     def get_queryset(self):
-        return FAQ.objects.all()
-    
+        return FAQ.objects.filter(user=self.request.user)
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
@@ -90,7 +116,7 @@ class CardView(ModelViewSet):
 
     def get_queryset(self):
         return Card.objects.filter(user=self.request.user)
-    
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
@@ -110,7 +136,7 @@ class ConnectionView(ModelViewSet):
 
     def get_queryset(self):
         return Connection.objects.filter(user=self.request.user)
-    
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
