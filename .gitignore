@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.env
+
+# Docker
+*.log
+mysql_data/
+*.pid
+*.sock
+
+# VSCode or other editors
+.vscode/
+.idea/
+
+# Byte-compiled / optimized / DLL files
+*.pyc
