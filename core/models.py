@@ -1,8 +1,6 @@
 from django.db import models
 from taggit.managers import TaggableManager
 from django.contrib.auth.models import User
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 
 MODE_CHOICE = [
     ('online', 'Online'),
@@ -10,7 +8,36 @@ MODE_CHOICE = [
     ('hybrid', 'Hybrid'),
 ]
 
-class Page(models.Model):
+CARD_TYPE_CHOICES = [
+    ('dummy', 'Page Type Dummy'),
+    ('personel', 'Personal'),
+    ('brand', 'Brand'),
+]
+
+STATUS_CHOICES = [
+    ('active', 'Active'),
+    ('archived', 'Archived'),
+]
+
+class TimeStampedModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+class Card(models.Model):
+    card_type = models.CharField(max_length=100, choices=CARD_TYPE_CHOICES, verbose_name='Card Type')
+    page_name = models.CharField(max_length=100, verbose_name="Page or Brand Name")
+    page_url = models.SlugField(unique=True, verbose_name="Page URL (subdomain or slug)")
+    accept_terms = models.BooleanField(default=False)
+    receive_newsletter = models.BooleanField(default=False, blank=True, null=True)
+
+    def __str__(self):
+        return self.page_name
+
+class Page(TimeStampedModel):
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='pages')
     owner = models.OneToOneField(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
@@ -18,22 +45,26 @@ class Page(models.Model):
     profile_image = models.ImageField(upload_to='pages_profiles/', blank=True, null=True)
     cover_image = models.ImageField(upload_to='pages_cover/', blank=True, null=True)
     subscribers = models.ManyToManyField(User, related_name='subscribed_pages', blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name
 
-class Client(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cleint_profiles')
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='clients')
-    full_name = models.CharField(max_length=150)
-    date = models.DateField(auto_now_add=True)
+
+class Subscriber(models.Model):
+    page = models.ForeignKey(Page, on_delete=models.CASCADE)
+    email = models.EmailField()
+    name = models.CharField(max_length=150)
+    subscriber_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('page', 'email')
 
     def __str__(self):
-        return self.full_name
+        return f"{self.email} on {self.page.name}"
+    
 
 class Business(models.Model):
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='businesses')
+    page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='businesses')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     mode = models.CharField(max_length=100, choices=MODE_CHOICE, verbose_name='Working Mode')
     activity = models.CharField(max_length=150, verbose_name='Business Activity')
@@ -49,106 +80,55 @@ class Business(models.Model):
         return f"{self.activity} - {self.service}"
 
 class Contact(models.Model):
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='contacts')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='contacts')
     whatsapp_number = models.CharField(max_length=20)
     email = models.EmailField()
 
 class Location(models.Model):
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='locations')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='locations')
     country = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
     location_address = models.CharField(max_length=150)
 
 class Hour(models.Model):
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='hours')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='hours')
     hour = models.TimeField()
 
 class Social(models.Model):
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='socials')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    instagram = models.CharField(max_length=150)
-    facebook = models.CharField(max_length=150)
-    snapshat = models.CharField(max_length=150)
-    x = models.CharField(max_length=150)
-    tikto = models.CharField(max_length=150)
-    threads = models.CharField(max_length=150)
-    linkedin = models.CharField(max_length=150)
-    youtube = models.CharField(max_length=150)
+    page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='socials')
+    platform = models.CharField(max_length=150)
+    url = models.URLField()
 
 class Media(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='media')
-    cover_image = models.ImageField(upload_to='cover_images/')
-    profile_image = models.ImageField(upload_to='profile/')
-    video = models.FileField(upload_to='videos/')
-    images = models.ImageField(upload_to='gallery/')
+    page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='media')
+    cover_image = models.ImageField(upload_to='cover_images/', blank=True, null=True)
+    profile_image = models.ImageField(upload_to='profile/', blank=True, null=True)
+    video = models.FileField(upload_to='videos/', blank=True, null=True)
+    images = models.ImageField(upload_to='gallery/', blank=True, null=True)
 
 class FAQ(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='faqs')
+    page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='faqs')
     question = models.CharField(max_length=150)
-    answer = models.CharField(max_length=150)  # Fixed typo
+    answer = models.CharField(max_length=150)
 
-class Card(models.Model):
-    CARD_TYPE_CHOICES = [
-        ('dummy', 'Page Type Dummy'),
-        ('personel', 'Personel'),
-        ('brand', 'Brand'),
-    ]
+class Label(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='cards')
-    card_type = models.CharField(max_length=100, choices=CARD_TYPE_CHOICES, verbose_name='Card Type')
-    page_name = models.CharField(max_length=100, verbose_name="Page or Brand Name")
-    page_url = models.SlugField(unique=True, verbose_name="Page URL (subdomain or slug)")
-    accept_terms = models.BooleanField(default=False)
-    receive_newsletter = models.BooleanField(default=False, blank=True, null=True)
+    page = models.ForeignKey(Page, on_delete=models.CASCADE)
+    name = models.CharField(max_length=150)
 
-    def __str__(self):
-        return self.page_name
 
+class SubscriberLabel(models.Model):
+    label = models.ForeignKey(Label, on_delete=models.CASCADE)
+    subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 class Connection(models.Model):
-    STATUS_CHOICES = [
-        ('active', 'Active'),
-        ('archived', 'Archived'),
-    ]
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='client_connections')
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='connections')
-    full_name = models.CharField(max_length=150)
-    contact = models.ForeignKey(Contact, on_delete=models.CASCADE)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='connection_locations')
-    label = models.CharField(max_length=150)
+    page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='connections')
+    label = models.ForeignKey(Label, on_delete=models.CASCADE)
     active = models.CharField(max_length=100, choices=STATUS_CHOICES, default='active')
 
     def __str__(self):
-        return self.full_name
-
-class Profile(models.Model):
-    GENDER_CHOICES = [
-        ('male', 'Male'),
-        ('female', 'Female'),
-        ('other', 'Other'),
-    ]
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='profiles')
-    phone = models.CharField(max_length=20, blank=True)
-    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True)
-    birthdate = models.DateField(null=True, blank=True)
-    country = models.CharField(max_length=100, blank=True)
-    city = models.CharField(max_length=100, blank=True)
-    address = models.CharField(max_length=255, blank=True)
-    profile_image = models.ImageField(upload_to='profile_images/', null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.user.get_full_name() or self.user.username} Profile"
-
-@receiver(post_save, sender=User)
-def create_or_update_user_profile(sender, instance, created, **kwargs):
-    if created:
-        Profile.objects.create(user=instance)
-    else:
-        instance.profile.save()
+        return f"{self.label} - {self.page}"

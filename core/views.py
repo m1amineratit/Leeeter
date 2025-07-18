@@ -1,23 +1,22 @@
-from django.shortcuts import render
+from credits.models import CreditsTransaction
 from .models import (
     Page, Business, Contact, Location, Hour, Social, Media, FAQ,
-    Card, Client, Connection, Profile
+    Card, Connection, Label, SubscriberLabel, Subscriber
 )
-from rest_framework import permissions, viewsets
+from rest_framework import permissions
 from rest_framework.viewsets import ModelViewSet
 from .serializers import (
-    PageSerializer, BusinessSerializer, ContactSerializer, LocationSerializer, HoursSerializer,
+    PageSerializer, BusinessSerializer, ContactSerializer, LocationSerializer, HourSerializer,
     SocialSerializer, MediaSerializer, FAQSerializer, CardSerializer,
-    ClientSerializer, ConnectionSerializer, ProfileSerializer
+    ConnectionSerializer
 )
 from .permissions import IsOwner
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
-from dj_rest_auth.registration.views import SocialLoginView
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from rest_framework.decorators import api_view, permission_classes
+from .tasks import send_email_task, broadcast_send_email_task
 
-class GoogleLogin(SocialLoginView):
-    adapter_class = GoogleOAuth2Adapter
 
 # Page ViewSet with subscribe/unsubscribe actions
 class PageViewSet(ModelViewSet):
@@ -75,7 +74,7 @@ class LocationView(ModelViewSet):
         serializer.save(user=self.request.user)
 
 class HoursView(ModelViewSet):
-    serializer_class = HoursSerializer
+    serializer_class = HourSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwner]
 
     def get_queryset(self):
@@ -124,32 +123,97 @@ class CardView(ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-class ClientView(ModelViewSet):
-    serializer_class = ClientSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOwner]
-
-    def get_queryset(self):
-        return Client.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
 
 class ConnectionView(ModelViewSet):
     serializer_class = ConnectionSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwner]
 
     def get_queryset(self):
-        return Connection.objects.filter(user=self.request.user)
+        pages = Page.objects.filter(owner=self.request.user)
+        return Connection.objects.filter(subscribed_pages__in=pages)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-class ProfileViewSet(viewsets.ModelViewSet):
-    serializer_class = ProfileSerializer
-    permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        return Profile.objects.filter(user=self.request.user)
+def charge_user(user, amount, description):
+    try:
+        user.credit.spend_credits(amount)
+        CreditsTransaction.objects.create(
+            user=user,
+            transaction_type='SPEND',
+            amount=amount,
+            description=description
+        )
+    except ValueError:
+        raise PermissionDenied("Insufficient credits")
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def send_email_from_page(request):
+    subject = request.data.get('subject')
+    message = request.data.get('message')
+    to_email = request.data.get('to_email')
+
+    if not all([subject, message, to_email]):
+        return Response({'error' : 'Missing fields'}, status=400)
+    
+    try:
+        page = Page.objects.get(owner=request.user)
+    except ObjectDoesNotExist:
+        return Response({'error' : 'Page not found for this user'}, status=404)
+    
+    subscribers_user = page.subscribers.all()
+    if not subscribers_user(email=to_email).exists():
+        return Response({'email' : 'Recipient is not a subscriber of your page'}, status=403)
+    
+    charge_user(request.user, 10, 'Send Email to subscriber')
+
+    send_email_task.delay(subject, message, to_email)
+
+    return Response({"message": "Email is being sent. 10 credits deducted."})
+
+@api_view(['POST'])
+@permission_classes([[permissions.IsAuthenticated]])
+def add_label_to_subscriber(request):
+    user = request.user
+    page_id = request.data.get('page_id')
+    label_name = request.data.get('label')
+    subscriber_id = request.data.get('subscriber_id')
+
+    if user.profile.credits < 200:
+        return Response({'error' : 'Credits not enough'}, status=403)
+    
+    page = Page.objects.get(id=page_id)
+    label, _ = Label.objects.get_or_create(user=user, page=page, name=label_name)
+    subscriber = Subscriber.objects.get(id=subscriber_id, page=page)
+
+    SubscriberLabel.objects.create(label=label, subscriber=subscriber)
+    
+    return Response({"message": f"Label '{label_name}' added to subscriber."})
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def broadcast_message(request):
+    user = request.user
+    page_id = request.data.get('page_id')
+    subject = request.data.get('subject')
+    content = request.data.get('content')
+
+    if user.profile.credits < 200:
+        return Response({'error' : 'Credits not enough'}, status=403)
+    
+    page = Page.objects.get(id=page_id, user=user)
+    subscribers = Subscriber.objects.filter(page=page)
+
+    for subscriber in subscribers:
+        broadcast_send_email_task.delay(
+            to_email=subscriber.email,
+            subject=subject,
+            content=content,
+        )
+
+    user.profile.credits -= 200
+    user.profile.credits.save()
+    
+    return Response({"message": "Broadcast scheduled."})

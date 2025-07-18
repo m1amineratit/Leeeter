@@ -13,11 +13,12 @@ router.register(r'socials', views.SocialView, basename='social')
 router.register(r'media', views.MediaView, basename='media')
 router.register(r'faqs', views.FAQView, basename='faq')
 router.register(r'cards', views.CardView, basename='card')
-router.register(r'clients', views.ClientView, basename='client')
 router.register(r'connections', views.ConnectionView, basename='connection')
-router.register(r'profile', views.ProfileViewSet, basename='profile')
 router.register(r'pages', views.PageViewSet, basename='page')
 
 urlpatterns = [
-    path('', include(router.urls))
+    path('', include(router.urls)),
+    path('send_email', views.send_email_from_page, name='send_email'),
+    path('add_label/', views.add_label_to_subscriber, name='add_label'),
+    path('broadcast/', views.broadcast_message, name='broadcast'),
 ]
