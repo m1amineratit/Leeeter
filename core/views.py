@@ -119,7 +119,7 @@ class CardView(ModelViewSet):
 
     def get_queryset(self):
         return Card.objects.filter(user=self.request.user)
-
+    
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
@@ -164,7 +164,7 @@ def send_email_from_page(request):
         return Response({'error' : 'Page not found for this user'}, status=404)
     
     subscribers_user = page.subscribers.all()
-    if not subscribers_user(email=to_email).exists():
+    if not subscribers_user.filter(email=to_email).exists():
         return Response({'email' : 'Recipient is not a subscriber of your page'}, status=403)
     
     charge_user(request.user, 10, 'Send Email to subscriber')
@@ -191,6 +191,7 @@ def add_label_to_subscriber(request):
     SubscriberLabel.objects.create(label=label, subscriber=subscriber)
     
     return Response({"message": f"Label '{label_name}' added to subscriber."})
+
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])

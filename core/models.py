@@ -27,6 +27,7 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 class Card(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     card_type = models.CharField(max_length=100, choices=CARD_TYPE_CHOICES, verbose_name='Card Type')
     page_name = models.CharField(max_length=100, verbose_name="Page or Brand Name")
     page_url = models.SlugField(unique=True, verbose_name="Page URL (subdomain or slug)")
@@ -51,6 +52,7 @@ class Page(TimeStampedModel):
 
 
 class Subscriber(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     page = models.ForeignKey(Page, on_delete=models.CASCADE)
     email = models.EmailField()
     name = models.CharField(max_length=150)
@@ -80,21 +82,25 @@ class Business(models.Model):
         return f"{self.activity} - {self.service}"
 
 class Contact(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='contacts')
     whatsapp_number = models.CharField(max_length=20)
     email = models.EmailField()
 
 class Location(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='locations')
     country = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
     location_address = models.CharField(max_length=150)
 
 class Hour(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='hours')
     hour = models.TimeField()
 
 class Social(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='socials')
     platform = models.CharField(max_length=150)
     url = models.URLField()

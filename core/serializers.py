@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     Page, Business, Contact, Location, Hour, Social, Media, FAQ,
-    Card, Connection
+    Card, Connection, Subscriber, Label, SubscriberLabel
 )
 
 # ✅ Reusable base to auto-fill user from request
@@ -40,7 +40,7 @@ class LocationSerializer(UserOwnedSerializer):
         fields = '__all__'
         read_only_fields = ['user']
 
-class HourSerializer(UserOwnedSerializer):  # 🧠 renamed from HoursSerializer
+class HourSerializer(UserOwnedSerializer):
     class Meta:
         model = Hour
         fields = '__all__'
@@ -68,11 +68,22 @@ class CardSerializer(serializers.ModelSerializer):
     class Meta:
         model = Card
         fields = '__all__'
-        # Card has no user field anymore — good
-
+        read_only_fields = ['user']
 
 class ConnectionSerializer(UserOwnedSerializer):
     class Meta:
         model = Connection
         fields = '__all__'
         read_only_fields = ['user']
+
+class SubscriberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subscriber
+        fields = '__all__'
+        read_only = ['user']
+
+class Label(serializers.ModelSerializer):
+    class Meta:
+        model = Label
+        fields = '__all__'
+        read_only = ['user']

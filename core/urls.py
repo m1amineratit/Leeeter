@@ -19,6 +19,6 @@ router.register(r'pages', views.PageViewSet, basename='page')
 urlpatterns = [
     path('', include(router.urls)),
     path('send_email', views.send_email_from_page, name='send_email'),
-    path('add_label/', views.add_label_to_subscriber, name='add_label'),
-    path('broadcast/', views.broadcast_message, name='broadcast'),
+    path('add_label', views.add_label_to_subscriber, name='add_label'),
+    path('broadcast', views.broadcast_message, name='broadcast'),
 ]
