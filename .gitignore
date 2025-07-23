@@ -16,3 +16,7 @@ mysql_data/
 
 # Byte-compiled / optimized / DLL files
 *.pyc
+
+
+# HTML
+*test.html
