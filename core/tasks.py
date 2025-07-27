@@ -14,6 +14,6 @@ def send_email_task(subject, message, to_email):
 
 @shared_task
 def broadcast_send_email_task(subject, message, to_email):
-    send_mail(subject, message, settings.DEFAULT_fROM_EMAIL, [to_email])
+    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [to_email])
 
     

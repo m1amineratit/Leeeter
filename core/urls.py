@@ -15,10 +15,12 @@ router.register(r'faqs', views.FAQView, basename='faq')
 router.register(r'cards', views.CardView, basename='card')
 router.register(r'connections', views.ConnectionView, basename='connection')
 router.register(r'pages', views.PageViewSet, basename='page')
+router.register(r'post', views.PageViewSet, basename='post')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('send_email', views.send_email_from_page, name='send_email'),
+    path('pages/<int:page_id>/send_email', views.send_email_from_page, name='send_email'),
     path('add_label', views.add_label_to_subscriber, name='add_label'),
-    path('broadcast', views.broadcast_message, name='broadcast'),
+    path('broadcast_message', views.broadcast_message, name='broadcast'),
+    path('page-assistant/<int:page_id>/', views.PageAssistantAPIView.as_view(), name='page-assistant'),
 ]

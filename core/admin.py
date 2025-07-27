@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Card, Page, Business, Contact, Location, Hour, Connection, FAQ, Social, Media, Label, Subscriber
+from .models import Card, Page, Business, Contact, Location, Hour, Connection, FAQ, Social, Media, Label, Subscriber, Post
 
 # Register your models here.
 
@@ -15,3 +15,4 @@ admin.site.register(Social)
 admin.site.register(Media)
 admin.site.register(Label)
 admin.site.register(Subscriber)
+admin.site.register(Post)

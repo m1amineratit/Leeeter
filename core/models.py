@@ -50,6 +50,16 @@ class Page(TimeStampedModel):
     def __str__(self):
         return self.name
 
+class Post(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='media_posts/', blank=True, null=True)
+    title = models.CharField(max_length=250)
+    content = models.TextField()
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='posts')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Post on {self.title} by {self.user.username}"
 
 class Subscriber(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -58,8 +68,7 @@ class Subscriber(models.Model):
     name = models.CharField(max_length=150)
     subscriber_at = models.DateTimeField(auto_now_add=True)
     
-    class Meta:
-        unique_together = ('page', 'email')
+
 
     def __str__(self):
         return f"{self.email} on {self.page.name}"
@@ -113,22 +122,33 @@ class Media(models.Model):
     video = models.FileField(upload_to='videos/', blank=True, null=True)
     images = models.ImageField(upload_to='gallery/', blank=True, null=True)
 
+    def __str__(self):
+        return f"Media of {self.page}"
+
 class FAQ(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     page = models.ForeignKey(Page, blank=True, null=True, on_delete=models.CASCADE, related_name='faqs')
     question = models.CharField(max_length=150)
     answer = models.CharField(max_length=150)
 
+    def __str__(self):
+        return f"Question: {self.question} on {self.page}"
+
 class Label(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     page = models.ForeignKey(Page, on_delete=models.CASCADE)
     name = models.CharField(max_length=150)
 
+    def __str__(self):
+        return f"{self.user.username}: {self.name}"
 
 class SubscriberLabel(models.Model):
     label = models.ForeignKey(Label, on_delete=models.CASCADE)
     subscriber = models.ForeignKey(Subscriber, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.subscriber}"
 
 class Connection(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

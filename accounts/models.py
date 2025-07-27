@@ -21,7 +21,8 @@ class Profile(models.Model):
     city = models.CharField(max_length=100, blank=True)
     address = models.CharField(max_length=255, blank=True)
     profile_image = models.ImageField(upload_to='profile_images/', null=True, blank=True)
-
+    credits = models.IntegerField(default=0, blank=True, null=True)
+    
     def __str__(self):
         return f"{self.user.get_full_name() or self.user.username} Profile"
 

@@ -13,9 +13,14 @@ def add_credits(request):
     try:
         amount = float(request.data.get('amount', 0))
         if amount <= 0:
-            return Response({'error' : 'Amount must be positive'}, status=400)
-        
-        request.user.credit.add_credits(amount)
+            return Response({'error': 'Amount must be positive'}, status=400)
+
+        # Get user's UserCredits object
+        user_credits = request.user.credits.first()
+        if not user_credits:
+            return Response({'error': 'Credit account not found'}, status=404)
+
+        user_credits.add_credits(amount)
 
         CreditsTransaction.objects.create(
             user=request.user,
@@ -23,16 +28,18 @@ def add_credits(request):
             amount=amount,
             description='User added credits'
         )
-        return Response({'message' : 'Credits added ', 'balance': request.user.credit.balance})
-    
+        return Response({'message': 'Credits added', 'balance': user_credits.balance})
+
     except Exception as e:
-        return Response({'error' : str(e)}, status=500)
-    
+        return Response({'error': str(e)}, status=500)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def view_balance(request):
-    return Response({'balance' : request.user.credit.balance})
+    user_credits = request.user.credits.first()
+    if not user_credits:
+        return Response({'error' : 'Credit account not found'}, status=404)
+    return Response({'balance' : user_credits.balance})
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -54,7 +61,11 @@ def use_credits(request):
         if cost <= 0:
             return Response({'error': 'Amount must be positive'}, status=400)
 
-        request.user.credit.deduct_credits(cost)
+        user_credits = request.user.credits.first()
+        if not user_credits:
+            return Response({'error': 'Credit account not found'}, status=404)
+
+        user_credits.deduct_credits(cost)
 
         CreditsTransaction.objects.create(
             user=request.user,
@@ -65,7 +76,7 @@ def use_credits(request):
 
         return Response({
             'message': f'Deducted ${cost:.2f}',
-            'remaining_balance': request.user.credit.balance
+            'remaining_balance': user_credits.balance  # ✅ Use the object you already got
         })
 
     except ValueError as e:

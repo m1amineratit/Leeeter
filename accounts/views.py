@@ -20,6 +20,7 @@ from django.conf import settings
 # Create your views here.
 
 class GoogleClientIDAPIView(APIView):
+    permission_classes = [AllowAny]
     """
     Returns the Google OAuth client ID (public info) to the frontend.
     """
@@ -27,9 +28,9 @@ class GoogleClientIDAPIView(APIView):
         return Response({"client_id": settings.GOOGLE_CLIENT_ID})
 
 class GoogleAuthAPIView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         id_token = request.data.get("access_token")  # actually ID token here
-        print(id_token, "sssssssssssssss")
         if not id_token:
             return Response({"error": "Missing ID token"}, status=400)
 

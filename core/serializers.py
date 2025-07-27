@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     Page, Business, Contact, Location, Hour, Social, Media, FAQ,
-    Card, Connection, Subscriber, Label, SubscriberLabel
+    Card, Connection, Subscriber, Label, SubscriberLabel, Post
 )
 
 # ✅ Reusable base to auto-fill user from request
@@ -20,6 +20,12 @@ class PageSerializer(serializers.ModelSerializer):
         model = Page
         fields = '__all__'
         read_only_fields = ['owner', 'subscribers', 'created_at']
+
+class PostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = '__all__'
+        read_only = ['user']
 
 # ✅ Business
 class BusinessSerializer(UserOwnedSerializer):

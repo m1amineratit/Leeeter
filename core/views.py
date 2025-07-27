@@ -1,14 +1,14 @@
 from credits.models import CreditsTransaction
 from .models import (
     Page, Business, Contact, Location, Hour, Social, Media, FAQ,
-    Card, Connection, Label, SubscriberLabel, Subscriber
+    Card, Connection, Label, SubscriberLabel, Subscriber, Post
 )
 from rest_framework import permissions
 from rest_framework.viewsets import ModelViewSet
 from .serializers import (
     PageSerializer, BusinessSerializer, ContactSerializer, LocationSerializer, HourSerializer,
     SocialSerializer, MediaSerializer, FAQSerializer, CardSerializer,
-    ConnectionSerializer
+    ConnectionSerializer, PostSerializer
 )
 from .permissions import IsOwner
 from rest_framework.decorators import action
@@ -16,7 +16,11 @@ from rest_framework.response import Response
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from rest_framework.decorators import api_view, permission_classes
 from .tasks import send_email_task, broadcast_send_email_task
-
+from rest_framework.views import APIView
+import requests
+from django.conf import settings
+from rest_framework import status
+from django.shortcuts import get_object_or_404
 
 # Page ViewSet with subscribe/unsubscribe actions
 class PageViewSet(ModelViewSet):
@@ -41,6 +45,66 @@ class PageViewSet(ModelViewSet):
         page = self.get_object()
         page.subscribers.remove(request.user)
         return Response({'status': 'unsubscribed'})
+
+class Post(ModelViewSet):
+    serializer_class = PostSerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwner]
+
+    def get_queryset(self):
+        page = Page.objects.get(owner=self.request.user)
+        return Page.objects.filter(page=page)
+        
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+OPENROUTER_API_KEY = settings.OPENROUTER_API_KEY
+class PageAssistantAPIView(APIView):
+    def post(self, request, page_id):
+        user_message = request.data.get('message', '')
+        if not user_message:
+            return Response({'error' : 'Message is reuired'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        page = get_object_or_404(Page, id=page_id)
+        posts_text = '\n'.join(post.content for post in page.posts.all()[:10])
+
+        context = f"""
+        You are analyzing a social media page with the following information:
+        Title: "{page.name}"
+        Description: {page.description}
+
+        Recent Posts:
+        {posts_text}
+
+        Media:
+        Profile Image URL: {page.profile_image.url if page.profile_image else 'No profile image'}
+        Cover Image URL: {page.cover_image.url if page.cover_image else 'No cover image'}
+        """
+
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization" : f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type" : "application/json"
+        }
+        data = {
+            "model" : "mistralai/mistral-small-3.2-24b-instruct:free",
+            "messages" : [
+                {"role": "system", "content": "You are an assistant that helps summarize and answer questions about social media pages."},
+                {"role": "user", "content": f"{context}\n\nUser question: {user_message}"}
+            ],
+            "max_tokens": 300,
+            'temperature': 0.7,
+        }
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            result = response.json()
+            if "choices" not in result:
+                return Response({"error": "OpenRouter did not return 'choices'. Full response:", "response": result}, status=500)
+            reply = result["choices"][0]["message"]["content"]
+            return Response({"reply": reply})
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
 
 # All other ViewSets now require a page relation
 class BusinessView(ModelViewSet):
@@ -129,16 +193,24 @@ class ConnectionView(ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsOwner]
 
     def get_queryset(self):
-        pages = Page.objects.filter(owner=self.request.user)
-        return Connection.objects.filter(subscribed_pages__in=pages)
+        # Return connections where the related page's owner is the current user
+        return Connection.objects.filter(page__owner=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        page = serializer.validated_data.get('page')
 
+        # Optional: Check the page belongs to the user
+        if page and page.owner != self.request.user:
+            raise PermissionDenied("You cannot create a connection for a page you do not own.")
+
+        serializer.save(user=self.request.user)
 
 def charge_user(user, amount, description):
     try:
-        user.credit.spend_credits(amount)
+        user_credits = user.credits.first()
+        if not user_credits:
+            return PermissionDenied('User does not have a credits account')
+        user_credits.deduct_credits(amount)
         CreditsTransaction.objects.create(
             user=user,
             transaction_type='SPEND',
@@ -150,7 +222,7 @@ def charge_user(user, amount, description):
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
-def send_email_from_page(request):
+def send_email_from_page(request, page_id):
     subject = request.data.get('subject')
     message = request.data.get('message')
     to_email = request.data.get('to_email')
@@ -159,22 +231,25 @@ def send_email_from_page(request):
         return Response({'error' : 'Missing fields'}, status=400)
     
     try:
-        page = Page.objects.get(owner=request.user)
+        page = Page.objects.get(id=page_id, owner=request.user)
     except ObjectDoesNotExist:
         return Response({'error' : 'Page not found for this user'}, status=404)
     
-    subscribers_user = page.subscribers.all()
-    if not subscribers_user.filter(email=to_email).exists():
+
+    if not Subscriber.objects.filter(page=page, email=to_email).exists():
         return Response({'email' : 'Recipient is not a subscriber of your page'}, status=403)
     
-    charge_user(request.user, 10, 'Send Email to subscriber')
-
+    try:
+        charge_user(request.user, 10, 'Send Email to subscriber')
+    except PermissionDenied as e:
+        return Response({'error' : str(e)}, status=403)
+    
     send_email_task.delay(subject, message, to_email)
 
     return Response({"message": "Email is being sent. 10 credits deducted."})
 
 @api_view(['POST'])
-@permission_classes([[permissions.IsAuthenticated]])
+@permission_classes([permissions.IsAuthenticated])
 def add_label_to_subscriber(request):
     user = request.user
     page_id = request.data.get('page_id')
@@ -193,6 +268,8 @@ def add_label_to_subscriber(request):
     return Response({"message": f"Label '{label_name}' added to subscriber."})
 
 
+from django.shortcuts import get_object_or_404
+
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def broadcast_message(request):
@@ -202,9 +279,13 @@ def broadcast_message(request):
     content = request.data.get('content')
 
     if user.profile.credits < 200:
-        return Response({'error' : 'Credits not enough'}, status=403)
-    
-    page = Page.objects.get(id=page_id, user=user)
+        return Response({'error': 'Credits not enough'}, status=403)
+
+    try:
+        page = Page.objects.get(id=page_id, owner=user)
+    except Page.DoesNotExist:
+        return Response({'error': 'Page not found or not owned by you'}, status=404)
+
     subscribers = Subscriber.objects.filter(page=page)
 
     for subscriber in subscribers:
@@ -215,6 +296,6 @@ def broadcast_message(request):
         )
 
     user.profile.credits -= 200
-    user.profile.credits.save()
-    
+    user.profile.save()
+
     return Response({"message": "Broadcast scheduled."})
